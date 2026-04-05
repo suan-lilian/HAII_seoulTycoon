@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>서울대 생존백서</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ===== 타이틀 ===== -->
+  <div id="screen-title" class="screen active">
+    <div class="title-inner">
+      <p class="title-badge">SNU Life Tycoon</p>
+      <h1 class="title-main">서울대<br>생존백서</h1>
+      <p class="title-sub">"학업, 연애, 동아리를<br>동시에 챙기는 건 불가능하다"</p>
+
+      <div class="howto-box">
+        <div class="howto-row"><span class="hn">1</span><span>미션 카드를 클릭해서 선택</span></div>
+        <div class="howto-row"><span class="hn">2</span><span>아래 활동 카드 클릭 → 슬롯 채우기</span></div>
+        <div class="howto-row"><span class="hn">3</span><span>완료하면 스탯 상승!</span></div>
+      </div>
+
+      <div class="title-stat-preview">
+        <span class="tsp academic">📚 학업</span>
+        <span class="tsp romance">💕 연애</span>
+        <span class="tsp club">🎯 동아리</span>
+      </div>
+
+      <button class="btn-main" onclick="startGame()">입학하기 →</button>
+    </div>
+  </div>
+
+  <!-- ===== 게임 ===== -->
+  <div id="screen-game" class="screen">
+
+    <!-- HUD -->
+    <div id="hud">
+      <div id="hud-top-row">
+        <span id="week-text">1학기 1주차</span>
+        <div id="hud-tags">
+          <span id="tag-exam" class="htag htag-exam hidden">⚠️ 시험기간</span>
+          <span id="tag-event" class="htag htag-event hidden"></span>
+        </div>
+        <div id="hud-timeline"><div id="tl-fill"></div></div>
+        <span id="hud-weekof">1/16</span>
+      </div>
+
+      <div id="hud-stats-row">
+        <div class="hstat-item">
+          <span class="hstat-icon">📚</span>
+          <div class="hbar-bg"><div class="hbar academic" id="bar-academic" style="width:30%"></div></div>
+          <span class="hval" id="val-academic">30</span>
+        </div>
+        <div class="hstat-item">
+          <span class="hstat-icon">💕</span>
+          <div class="hbar-bg"><div class="hbar romance" id="bar-romance" style="width:20%"></div></div>
+          <span class="hval" id="val-romance">20</span>
+        </div>
+        <div class="hstat-item">
+          <span class="hstat-icon">🎯</span>
+          <div class="hbar-bg"><div class="hbar club" id="bar-club" style="width:20%"></div></div>
+          <span class="hval" id="val-club">20</span>
+        </div>
+      </div>
+
+      <div id="timer-row">
+        <span id="timer-icon-el">⏱</span>
+        <div id="timer-bg"><div id="timer-fill"></div></div>
+        <span id="timer-num">90</span>
+      </div>
+    </div>
+
+    <!-- 미션 대기열 (상단 = 고객 줄) -->
+    <div id="queue-section">
+      <div class="sec-label">
+        이번 주 미션
+        <span id="queue-count-badge" class="badge"></span>
+        <span id="queue-hint" class="sec-hint">클릭해서 선택</span>
+      </div>
+      <div id="queue-row"></div>
+    </div>
+
+    <!-- 어셈블리 스테이션 (선택된 미션) -->
+    <div id="station-section">
+      <div id="station-empty">
+        <div class="station-empty-icon">☝️</div>
+        <div class="station-empty-text">위의 미션을 클릭해서 시작하세요</div>
+      </div>
+      <div id="station-card" class="hidden">
+
+        <!-- 미션 헤더 -->
+        <div id="st-header">
+          <span id="st-icon" class="st-icon"></span>
+          <div id="st-title-group">
+            <span id="st-title"></span>
+            <span id="st-cat-badge" class="st-badge"></span>
+          </div>
+          <div id="st-progress-wrap">
+            <span id="st-progress-text"></span>
+          </div>
+        </div>
+
+        <!-- 설명 -->
+        <p id="st-desc"></p>
+
+        <!-- 슬롯 (핵심: 무엇이 필요한지) -->
+        <div id="st-slots-label">필요 활동</div>
+        <div id="st-slots"></div>
+
+        <!-- 완료 효과 (어느 스탯이 오르고 내리는지) -->
+        <div id="st-effects">
+          <div class="eff-block" id="st-reward-block">
+            <span class="eff-label eff-label-good">✅ 완료 시</span>
+            <div id="st-reward-items" class="eff-items"></div>
+          </div>
+          <div class="eff-block" id="st-penalty-block">
+            <span class="eff-label eff-label-bad">❌ 미완료 시</span>
+            <div id="st-penalty-items" class="eff-items"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 활동 카드 (하단 = 재료 버튼) -->
+    <div id="act-section">
+      <div class="sec-label">
+        활동 카드
+        <span id="act-left-badge" class="badge">8</span>
+        <span id="act-hint" class="sec-hint">클릭해서 슬롯에 투입</span>
+      </div>
+      <div id="act-row"></div>
+    </div>
+
+    <!-- 마무리 버튼 -->
+    <div id="finish-bar">
+      <button id="btn-finish" onclick="finishWeek()">이번 주 마무리 →</button>
+    </div>
+
+  </div>
+
+  <!-- ===== 주차 요약 오버레이 ===== -->
+  <div id="overlay-summary" class="overlay hidden">
+    <div class="sum-modal">
+      <div class="sum-top">
+        <span id="sum-week-label" class="sum-week-label"></span>
+        <span id="sum-grade-badge" class="sum-grade"></span>
+      </div>
+      <div id="sum-missions-list"></div>
+      <div id="sum-stat-section">
+        <div class="sum-stat-title">이번 주 스탯 변화</div>
+        <div class="sum-stat-row">
+          <span>📚 학업</span>
+          <div class="sbar-bg"><div class="sbar academic" id="sbar-academic" style="width:0%"></div></div>
+          <span class="sval" id="sval-academic">0</span>
+          <span class="sdelta" id="sdelta-academic"></span>
+        </div>
+        <div class="sum-stat-row">
+          <span>💕 연애</span>
+          <div class="sbar-bg"><div class="sbar romance" id="sbar-romance" style="width:0%"></div></div>
+          <span class="sval" id="sval-romance">0</span>
+          <span class="sdelta" id="sdelta-romance"></span>
+        </div>
+        <div class="sum-stat-row">
+          <span>🎯 동아리</span>
+          <div class="sbar-bg"><div class="sbar club" id="sbar-club" style="width:0%"></div></div>
+          <span class="sval" id="sval-club">0</span>
+          <span class="sdelta" id="sdelta-club"></span>
+        </div>
+      </div>
+      <button id="btn-next" class="btn-main btn-next-week" onclick="nextWeek()">다음 주로 →</button>
+    </div>
+  </div>
+
+  <!-- ===== 엔딩 ===== -->
+  <div id="screen-ending" class="screen">
+    <div class="ending-inner">
+      <div class="ending-circle" id="ending-circle">B</div>
+      <h2 id="ending-title"></h2>
+      <p id="ending-desc"></p>
+      <div class="ending-stats">
+        <div class="e-row"><span>📚 학업</span><div class="e-bg"><div class="e-bar academic" id="ebar-academic" style="width:0%"></div></div><span id="eval-academic">0</span></div>
+        <div class="e-row"><span>💕 연애</span><div class="e-bg"><div class="e-bar romance"  id="ebar-romance"  style="width:0%"></div></div><span id="eval-romance">0</span></div>
+        <div class="e-row"><span>🎯 동아리</span><div class="e-bg"><div class="e-bar club"   id="ebar-club"    style="width:0%"></div></div><span id="eval-club">0</span></div>
+      </div>
+      <button class="btn-main" onclick="resetGame()">다시 플레이</button>
+    </div>
+  </div>
+
+  <!-- 토스트 -->
+  <div id="toast" class="toast hidden"></div>
+
+</div>
+<script src="js/main.js"></script>
+</body>
+</html>
