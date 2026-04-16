@@ -38,6 +38,8 @@
           </div>
 
           <button class="btn-main" onclick="startGame()">입학하기 →</button>
+          <button class="btn-leaderboard" onclick="openLeaderboard()">🏆 리더보드</button>
+          <button class="btn-settings-open" onclick="openSettings()">⚙️ 설정</button>
         </div>
       </div>
 
@@ -99,6 +101,16 @@
             <span id="timer-icon-el">⏱</span>
             <div id="timer-bg"><div id="timer-fill"></div></div>
             <span id="timer-num">90</span>
+          </div>
+        </div>
+
+        <!-- 캐릭터 바 -->
+        <div id="char-bar">
+          <canvas id="char-canvas"></canvas>
+          <div id="char-info">
+            <div id="char-name">🎓 나</div>
+            <div id="char-mood-text"></div>
+            <div id="char-event-hint"></div>
           </div>
         </div>
 
@@ -260,7 +272,88 @@
               <span id="eval-club">0</span>
             </div>
           </div>
-          <button class="btn-main" onclick="resetGame()">다시 플레이</button>
+          <div class="ending-actions">
+            <button class="btn-main" onclick="openSubmitScore()">🏆 기록 등록하기</button>
+            <button class="btn-leaderboard" onclick="openLeaderboard()">📋 리더보드 보기</button>
+            <button class="btn-replay" onclick="resetGame()">↩ 다시 플레이</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== 점수 등록 오버레이 ===== -->
+      <div id="overlay-submit" class="overlay hidden">
+        <div class="lb-modal">
+          <div class="lb-modal-header">
+            <span class="lb-modal-title">🏆 기록 등록</span>
+            <button class="btn-settings-close" onclick="closeSubmitScore()">✕</button>
+          </div>
+          <div id="submit-grade-preview" class="submit-grade-preview"></div>
+          <p class="submit-hint">닉네임을 입력하고 리더보드에 기록을 남기세요!</p>
+          <input type="text" id="input-playername" class="lb-name-input" placeholder="닉네임 입력 (최대 12자)" maxlength="12" />
+          <button class="btn-main" style="width:100%;margin-top:14px" onclick="submitScore()">등록하기</button>
+          <div id="submit-status" class="submit-status"></div>
+        </div>
+      </div>
+
+      <!-- ===== 리더보드 오버레이 ===== -->
+      <div id="overlay-leaderboard" class="overlay hidden">
+        <div class="lb-modal">
+          <div class="lb-modal-header">
+            <span class="lb-modal-title">🏆 리더보드 TOP 10</span>
+            <button class="btn-settings-close" onclick="closeLeaderboard()">✕</button>
+          </div>
+          <div id="lb-list" class="lb-list">
+            <div class="lb-loading">불러오는 중…</div>
+          </div>
+          <button class="btn-replay" style="margin-top:16px;width:100%" onclick="closeLeaderboard()">닫기</button>
+        </div>
+      </div>
+
+      <!-- ===== 설정 오버레이 ===== -->
+      <div id="overlay-settings" class="overlay hidden">
+        <div class="settings-modal">
+          <div class="settings-header">
+            <span class="settings-title">⚙️ 게임 설정</span>
+            <button class="btn-settings-close" onclick="closeSettings()">✕</button>
+          </div>
+
+          <div class="settings-body">
+            <div class="settings-row">
+              <label class="settings-label">⏱ 타이머</label>
+              <div class="settings-control">
+                <input type="number" id="cfg-timer" min="10" max="300" value="60" class="settings-input" />
+                <span class="settings-unit">초</span>
+              </div>
+            </div>
+            <div class="settings-row">
+              <label class="settings-label">📅 총 주차</label>
+              <div class="settings-control">
+                <input type="number" id="cfg-weeks" min="2" max="16" value="4" class="settings-input" />
+                <span class="settings-unit">주</span>
+              </div>
+            </div>
+            <div class="settings-divider">초기 스탯</div>
+            <div class="settings-row">
+              <label class="settings-label">📚 학업</label>
+              <div class="settings-control">
+                <input type="number" id="cfg-academic" min="0" max="100" value="30" class="settings-input" />
+              </div>
+            </div>
+            <div class="settings-row">
+              <label class="settings-label">💕 연애</label>
+              <div class="settings-control">
+                <input type="number" id="cfg-romance" min="0" max="100" value="20" class="settings-input" />
+              </div>
+            </div>
+            <div class="settings-row">
+              <label class="settings-label">🎯 동아리</label>
+              <div class="settings-control">
+                <input type="number" id="cfg-club" min="0" max="100" value="20" class="settings-input" />
+              </div>
+            </div>
+          </div>
+
+          <button class="btn-main" style="width:100%" onclick="saveSettings()">저장 후 닫기</button>
         </div>
       </div>
 

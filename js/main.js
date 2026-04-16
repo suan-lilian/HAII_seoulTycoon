@@ -3,7 +3,34 @@
    Game Logic
    ============================================================ */
 
-const TOTAL_WEEKS = 4; // ← 여기만 바꾸면 전체 주 수 변경
+/* ============================================================
+   Supabase 설정
+   ─────────────────────────────────────────────────────────────
+   1. https://supabase.com 에서 프로젝트 생성
+   2. SQL Editor에서 아래 실행:
+
+      create table leaderboard (
+        id        bigserial primary key,
+        name      text not null,
+        grade     text not null,
+        academic  int  not null,
+        romance   int  not null,
+        club      int  not null,
+        score     int  not null,
+        created_at timestamptz default now()
+      );
+      alter table leaderboard enable row level security;
+      create policy "read all"   on leaderboard for select using (true);
+      create policy "insert all" on leaderboard for insert with check (true);
+
+   3. Settings → API 에서 URL과 anon key를 복사해 아래에 붙여넣기
+   ============================================================ */
+const SUPABASE_URL = "https://wjslaxaopnctjwquosbs.supabase.co";
+const SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indqc2xheGFvcG5jdGp3cXVvc2JzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyNTM2NzksImV4cCI6MjA5MTgyOTY3OX0.0stYYr02QAMQ-hVlOnq4jxD7acxOJrdBiiCzfnsNVfY"; // ← 교체
+const LB_TABLE = "leaderboard";
+
+let TOTAL_WEEKS = 4; // ← 설정 화면에서 변경 가능
 
 // ============================================================
 // 활동 카드 데이터
@@ -91,12 +118,38 @@ const ACTIVITY_DB = [
   },
 ];
 
-// 슬롯 타입별 허용 활동 타입
+// 슬롯 타입별 허용 활동 ID (특정 카드 ID 또는 rest(자유시간))
 const SLOT_COMPAT = {
-  academic: ["academic", "wild"],
-  romance: ["romance", "wild"],
-  club: ["club", "wild"],
-  any: ["academic", "romance", "club", "wild"],
+  // ── 학업 활동 ──
+  library: ["library", "rest"],
+  homework: ["homework", "rest"],
+  cafe_s: ["cafe_s", "rest"],
+  gibo: ["gibo", "rest"],
+  // ── 연애 활동 ──
+  kakao: ["kakao", "rest"],
+  date: ["date", "rest"],
+  selca: ["selca", "rest"],
+  // ── 동아리 활동 ──
+  club_act: ["club_act", "rest"],
+  hoesik: ["hoesik", "rest"],
+  mt_prep: ["mt_prep", "rest"],
+  // ── 와일드 슬롯 (카테고리 단위) ──
+  academic: ["library", "homework", "cafe_s", "gibo", "rest"],
+  romance: ["kakao", "date", "selca", "rest"],
+  club: ["club_act", "hoesik", "mt_prep", "rest"],
+  any: [
+    "library",
+    "homework",
+    "cafe_s",
+    "gibo",
+    "kakao",
+    "date",
+    "selca",
+    "club_act",
+    "hoesik",
+    "mt_prep",
+    "rest",
+  ],
 };
 
 // ============================================================
@@ -110,7 +163,7 @@ const MISSION_DB = [
     icon: "📚",
     category: "academic",
     desc: "관정도서관에서 하루 종일 공부. 자리 선점이 실력이다.",
-    required: ["academic", "academic", "academic"],
+    required: ["library", "library", "library", "homework", "any"],
     reward: { academic: +18 },
     penalty: {},
     weight: 3,
@@ -121,7 +174,7 @@ const MISSION_DB = [
     icon: "📝",
     category: "academic",
     desc: "시험 범위를 정리하고 문제풀이에 집중한다.",
-    required: ["academic", "academic", "any"],
+    required: ["gibo", "homework", "cafe_s", "any"],
     reward: { academic: +14 },
     penalty: { academic: -8 },
     minWeek: 5,
@@ -134,7 +187,7 @@ const MISSION_DB = [
     icon: "✏️",
     category: "academic",
     desc: "학기 마지막 시험. 모든 것을 쏟아붓자.",
-    required: ["academic", "academic", "academic", "academic"],
+    required: ["gibo", "library", "cafe_s", "homework", "homework"],
     reward: { academic: +22 },
     penalty: { academic: -15 },
     minWeek: TOTAL_WEEKS - 2,
@@ -148,7 +201,7 @@ const MISSION_DB = [
     icon: "📋",
     category: "academic",
     desc: "선배에게 족보를 받아 시험을 준비한다. 인맥이 성적이다.",
-    required: ["club", "academic", "academic"],
+    required: ["club_act", "gibo", "library", "homework"],
     reward: { academic: +12, club: +5 },
     penalty: {},
     weight: 2,
@@ -159,7 +212,7 @@ const MISSION_DB = [
     icon: "📝",
     category: "academic",
     desc: "선배가 대리 출석을 부탁했다. 걸리면 큰일이지만...",
-    required: ["club", "any"],
+    required: ["club_act", "mt_prep", "any"],
     reward: { academic: -8, club: +10, romance: +5 },
     penalty: { academic: -20 },
     riskChance: 0.3,
@@ -175,7 +228,7 @@ const MISSION_DB = [
     icon: "💌",
     category: "romance",
     desc: "선배가 잡아준 소개팅. 준비부터 실전까지 신경 써야 한다.",
-    required: ["romance", "romance", "any"],
+    required: ["kakao", "date", "selca", "any"],
     reward: { romance: +18 },
     penalty: { romance: -5 },
     weight: 3,
@@ -186,7 +239,7 @@ const MISSION_DB = [
     icon: "💬",
     category: "romance",
     desc: '"오늘 뭐해?" 한 통의 메시지가 관계를 유지시킨다.',
-    required: ["romance", "romance"],
+    required: ["kakao", "kakao", "any"],
     reward: { romance: +10 },
     penalty: { romance: -8 },
     weight: 3,
@@ -197,7 +250,7 @@ const MISSION_DB = [
     icon: "🧋",
     category: "romance",
     desc: "샤로수길 카페에서 여유로운 오후. 공부는... 나중에.",
-    required: ["romance", "romance", "academic"],
+    required: ["kakao", "date", "date", "cafe_s"],
     reward: { romance: +14, academic: -5 },
     penalty: { romance: -3 },
     weight: 2,
@@ -208,7 +261,7 @@ const MISSION_DB = [
     icon: "😅",
     category: "romance",
     desc: '"나 보고 싶지 않아?" 수락하면 학업이 흔들린다.',
-    required: ["romance", "romance", "romance"],
+    required: ["kakao", "date", "selca", "date"],
     reward: { romance: +16, academic: -18 },
     penalty: { romance: -12 },
     minWeek: 7,
@@ -221,7 +274,7 @@ const MISSION_DB = [
     icon: "💝",
     category: "romance",
     desc: "썸을 정리할 타이밍. 성공하면 대박, 실패하면 연애 0.",
-    required: ["romance", "romance", "romance", "any"],
+    required: ["kakao", "date", "selca", "date", "any"],
     reward: { romance: +25 },
     penalty: { romance: -99 },
     riskChance: 0.4,
@@ -238,7 +291,7 @@ const MISSION_DB = [
     icon: "⛺",
     category: "club",
     desc: "선배들과 MT. 불참하면 동아리 내 이미지가 급락한다.",
-    required: ["club", "club", "romance"],
+    required: ["mt_prep", "mt_prep", "club_act", "kakao", "hoesik"],
     reward: { club: +20, romance: +5 },
     penalty: { club: -20 },
     specialWeek: 3,
@@ -250,7 +303,7 @@ const MISSION_DB = [
     icon: "🍻",
     category: "club",
     desc: "회식 참석. 분위기가 좋으면 연애 플래그도 생긴다.",
-    required: ["club", "club", "any"],
+    required: ["club_act", "hoesik", "hoesik", "any"],
     reward: { club: +12, romance: +3 },
     penalty: { club: -8 },
     weight: 3,
@@ -261,7 +314,7 @@ const MISSION_DB = [
     icon: "🎉",
     category: "club",
     desc: "다가오는 행사를 위해 준비에 매달린다.",
-    required: ["club", "club", "club"],
+    required: ["club_act", "club_act", "mt_prep", "mt_prep", "any"],
     reward: { club: +18 },
     penalty: { club: -5 },
     weight: 3,
@@ -272,7 +325,7 @@ const MISSION_DB = [
     icon: "🎤",
     category: "club",
     desc: "학업과 동아리를 동시에 챙길 수 있는 흔치 않은 기회.",
-    required: ["academic", "academic", "club", "club"],
+    required: ["library", "homework", "homework", "club_act", "club_act"],
     reward: { academic: +10, club: +12 },
     penalty: { club: -8 },
     weight: 2,
@@ -285,7 +338,7 @@ const MISSION_DB = [
     icon: "🎆",
     category: "special",
     desc: "축제에서 공연도 보고 부스도 운영한다.",
-    required: ["club", "romance", "any"],
+    required: ["club_act", "hoesik", "kakao", "any"],
     reward: { club: +10, romance: +8 },
     penalty: {},
     specialWeek: 6,
@@ -297,7 +350,7 @@ const MISSION_DB = [
     icon: "📊",
     category: "special",
     desc: "학회에서 발표. 잘 준비했다면 모두가 주목한다.",
-    required: ["academic", "academic", "club", "club"],
+    required: ["library", "library", "homework", "club_act", "club_act"],
     reward: { academic: +10, club: +15 },
     penalty: { club: -10 },
     specialWeek: 12,
@@ -309,7 +362,7 @@ const MISSION_DB = [
     icon: "⚖️",
     category: "special",
     desc: "학업도, 연애도, 동아리도 조금씩 챙기는 여유로운 한 주.",
-    required: ["academic", "romance", "club"],
+    required: ["cafe_s", "kakao", "club_act", "any"],
     reward: { academic: +6, romance: +6, club: +6 },
     penalty: {},
     weight: 2,
@@ -392,13 +445,22 @@ const ENDINGS = [
   },
 ];
 
-const EXAM_WEEKS = [Math.floor(TOTAL_WEEKS / 2), TOTAL_WEEKS];
+let EXAM_WEEKS = [Math.floor(TOTAL_WEEKS / 2), TOTAL_WEEKS];
 const SPECIAL_WEEKS = {
   3: "mt",
   6: "festival",
   12: "presentation_week",
 };
-const TIMER_SEC = 60; // 1분
+let TIMER_SEC = 60; // 1분
+
+// 게임 설정 (설정 화면에서 변경 가능)
+let CONFIG = {
+  timerSec: 60,
+  totalWeeks: 4,
+  initAcademic: 30,
+  initRomance: 20,
+  initClub: 20,
+};
 
 // ============================================================
 // 게임 상태
@@ -416,7 +478,11 @@ function initActivities() {
 function makeState() {
   return {
     week: 1,
-    stats: { academic: 30, romance: 20, club: 20 },
+    stats: {
+      academic: CONFIG.initAcademic,
+      romance: CONFIG.initRomance,
+      club: CONFIG.initClub,
+    },
     flags: new Set(),
     romanceResets: 0,
     missions: [], // active missions (최대 3개 보임)
@@ -434,9 +500,69 @@ function makeState() {
 // 시작 / 리셋
 // ============================================================
 function startGame() {
+  // CONFIG → 전역 상수 동기화
+  TOTAL_WEEKS = CONFIG.totalWeeks;
+  TIMER_SEC = CONFIG.timerSec;
+  EXAM_WEEKS = [Math.floor(TOTAL_WEEKS / 2), TOTAL_WEEKS];
+
+  // final_exam 미션의 주차 조건 동적 갱신
+  const fe = MISSION_DB.find((m) => m.id === "final_exam");
+  if (fe) {
+    fe.minWeek = TOTAL_WEEKS - 2;
+    fe.maxWeek = TOTAL_WEEKS;
+    fe.specialWeek = TOTAL_WEEKS;
+  }
+
   G = makeState();
   showScreen("screen-game");
+  initChar();
   startWeek();
+}
+
+// ============================================================
+// 설정 화면
+// ============================================================
+function openSettings() {
+  document.getElementById("cfg-timer").value = CONFIG.timerSec;
+  document.getElementById("cfg-weeks").value = CONFIG.totalWeeks;
+  document.getElementById("cfg-academic").value = CONFIG.initAcademic;
+  document.getElementById("cfg-romance").value = CONFIG.initRomance;
+  document.getElementById("cfg-club").value = CONFIG.initClub;
+  document.getElementById("overlay-settings").classList.remove("hidden");
+}
+
+function closeSettings() {
+  document.getElementById("overlay-settings").classList.add("hidden");
+}
+
+function saveSettings() {
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  CONFIG.timerSec = clamp(
+    parseInt(document.getElementById("cfg-timer").value) || 60,
+    10,
+    300,
+  );
+  CONFIG.totalWeeks = clamp(
+    parseInt(document.getElementById("cfg-weeks").value) || 4,
+    2,
+    16,
+  );
+  CONFIG.initAcademic = clamp(
+    parseInt(document.getElementById("cfg-academic").value) || 30,
+    0,
+    100,
+  );
+  CONFIG.initRomance = clamp(
+    parseInt(document.getElementById("cfg-romance").value) || 20,
+    0,
+    100,
+  );
+  CONFIG.initClub = clamp(
+    parseInt(document.getElementById("cfg-club").value) || 20,
+    0,
+    100,
+  );
+  closeSettings();
 }
 
 function resetGame() {
@@ -635,6 +761,7 @@ function expireMission(mIdx) {
   else if (G.activeMissionIdx > mIdx) G.activeMissionIdx--;
 
   G.missions.splice(mIdx, 1);
+  triggerCharReaction("fail");
   showToast(`⏰ ${mission.icon} ${mission.title} 시간 초과!`);
 
   refillQueue();
@@ -700,19 +827,14 @@ function useActivity(actIdx) {
     return;
   }
 
-  // 첫 번째 호환 가능한 빈 슬롯 찾기
-  let targetSlotIdx = -1;
-  for (let i = 0; i < mission.slots.length; i++) {
-    const slot = mission.slots[i];
-    if (slot.filled !== null) continue;
-    if (SLOT_COMPAT[slot.type].includes(act.type)) {
-      targetSlotIdx = i;
-      break;
-    }
-  }
+  // 순서대로만 채우기 — 다음 빈 슬롯이 곧 유일한 목표
+  const targetSlotIdx = mission.slots.findIndex((s) => s.filled === null);
+  if (targetSlotIdx < 0) return; // 이미 완료
 
-  if (targetSlotIdx < 0) {
-    showToast("이 미션에 맞지 않는 활동이에요 ❌");
+  const targetSlot = mission.slots[targetSlotIdx];
+  if (!SLOT_COMPAT[targetSlot.type].includes(act.id)) {
+    const needed = slotActivityName(targetSlot.type);
+    showToast(`순서 오류! 지금은 ${needed}이 필요해요 ❌`);
     const stCard = document.getElementById("station-card");
     if (stCard) {
       stCard.style.animation = "none";
@@ -786,7 +908,9 @@ function buyActivity(actId) {
   addDelta(costStat, -costAmt);
   G.activities[actId] = (G.activities[actId] || 0) + 2;
 
-  showToast(`${act.emoji} ${act.label} 충전! (${statEmoji(costStat)} -${costAmt})`);
+  showToast(
+    `${act.emoji} ${act.label} 충전! (${statEmoji(costStat)} -${costAmt})`,
+  );
 
   renderHUD();
   renderShop();
@@ -843,6 +967,7 @@ function completeMission(mIdx) {
   renderStationEmpty();
   renderShop();
 
+  triggerCharReaction(mission.category);
   if (extraMsg) showToast(extraMsg);
   else showToast(`${mission.icon} 완료! +${G.missionsCompleted}번째 미션`);
 }
@@ -1023,13 +1148,16 @@ function renderStationCard() {
   // 슬롯
   const slotsEl = document.getElementById("st-slots");
   slotsEl.innerHTML = "";
-  mission.slots.forEach((slot) => {
+  const nextEmptyIdx = mission.slots.findIndex((s) => s.filled === null);
+  mission.slots.forEach((slot, i) => {
     const el = document.createElement("div");
-    el.className = `sslot stype-${slot.type} ${slot.filled ? "filled" : "empty"}`;
+    const isNext = i === nextEmptyIdx;
+    const catClass = slotCategory(slot.type);
+    el.className = `sslot stype-${catClass} ${slot.filled ? "filled" : "empty"}${isNext ? " next-target" : ""}`;
     if (slot.filled) {
       el.innerHTML = `<span class="sslot-emoji">${slot.filled.emoji}</span><span class="sslot-label">${slot.filled.label}</span>`;
     } else {
-      el.innerHTML = `<span class="sslot-type-label">${slotTypeLabel(slot.type)}</span>`;
+      el.innerHTML = `<span class="sslot-emoji" style="opacity:0.35">${slotTypeLabel(slot.type)}</span><span class="sslot-label">${slotActivityName(slot.type)}</span>${isNext ? '<span class="sslot-arrow">▼</span>' : ""}`;
     }
     slotsEl.appendChild(el);
   });
@@ -1091,12 +1219,11 @@ function renderShop() {
   const activeMission =
     G.activeMissionIdx >= 0 ? G.missions[G.activeMissionIdx] : null;
 
-  // 현재 선택된 미션에서 아직 빈 슬롯들의 타입 모음
+  // 다음에 채워야 할 슬롯 타입만 표시 (순서 강제)
   let neededTypes = new Set();
   if (activeMission && !activeMission.complete) {
-    for (const slot of activeMission.slots) {
-      if (slot.filled === null) neededTypes.add(slot.type);
-    }
+    const nextSlot = activeMission.slots.find((s) => s.filled === null);
+    if (nextSlot) neededTypes.add(nextSlot.type);
   }
 
   const totalRemaining = ACTIVITY_DB.reduce(
@@ -1112,16 +1239,6 @@ function renderShop() {
     card.className = `act-card type-${act.type}`;
 
     // 호환성 표시
-    if (activeMission && !activeMission.complete) {
-      let compatible = false;
-      for (const slotType of neededTypes) {
-        if (SLOT_COMPAT[slotType].includes(act.type)) {
-          compatible = true;
-          break;
-        }
-      }
-      card.classList.add(compatible ? "compatible" : "incompatible");
-    }
 
     if (count > 0) {
       card.innerHTML = `
@@ -1221,6 +1338,8 @@ function showEnding() {
   let ending = ENDINGS.find((e) => e.check(s, r));
   if (!ending) ending = ENDINGS[ENDINGS.length - 1];
 
+  cacheEndingForLB(ending);
+  stopChar();
   showScreen("screen-ending");
 
   const circle = document.getElementById("ending-circle");
@@ -1304,9 +1423,455 @@ function typeLabel(type) {
 }
 
 function slotTypeLabel(type) {
-  return { academic: "📚", romance: "💕", club: "🎯", any: "✨" }[type] || "?";
+  const map = {
+    academic: "📚",
+    romance: "💕",
+    club: "🎯",
+    any: "✨",
+    library: "📚",
+    homework: "📖",
+    cafe_s: "☕",
+    gibo: "📋",
+    kakao: "💬",
+    date: "🧋",
+    selca: "🤳",
+    club_act: "🎯",
+    hoesik: "🍻",
+    mt_prep: "⛺",
+  };
+  return map[type] || "?";
+}
+
+// 슬롯 타입 → 한글 이름 (토스트 메시지용)
+function slotActivityName(type) {
+  const map = {
+    academic: "학업 활동",
+    romance: "연애 활동",
+    club: "동아리 활동",
+    any: "아무 활동",
+    library: "📚 도서관",
+    homework: "📖 과제",
+    cafe_s: "☕ 카페공부",
+    gibo: "📋 족보",
+    kakao: "💬 카톡",
+    date: "🧋 데이트",
+    selca: "🤳 셀카데이트",
+    club_act: "🎯 동아리",
+    hoesik: "🍻 회식",
+    mt_prep: "⛺ MT준비",
+  };
+  return map[type] || type;
+}
+
+// 슬롯 특정 ID → 카테고리 (CSS 색상 클래스용)
+function slotCategory(type) {
+  if (["library", "homework", "cafe_s", "gibo"].includes(type))
+    return "academic";
+  if (["kakao", "date", "selca"].includes(type)) return "romance";
+  if (["club_act", "hoesik", "mt_prep"].includes(type)) return "club";
+  return type; // academic / romance / club / any 그대로
 }
 
 function statEmoji(stat) {
   return { academic: "📚", romance: "💕", club: "🎯" }[stat] || stat;
+}
+
+// ============================================================
+// 리더보드
+// ============================================================
+let _lastEnding = null; // showEnding에서 저장
+
+// showEnding 내에서 호출해 현재 엔딩 정보를 캐시
+function cacheEndingForLB(ending) {
+  _lastEnding = ending;
+}
+
+// Supabase REST API 헬퍼
+async function sbFetch(path, options = {}) {
+  const url = `${SUPABASE_URL}/rest/v1/${path}`;
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+      ...(options.headers || {}),
+    },
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json();
+}
+
+// ── 점수 등록 모달 열기
+function openSubmitScore() {
+  const s = G.stats;
+  const score = s.academic + s.romance + s.club;
+  const grade = _lastEnding ? _lastEnding.grade : "?";
+
+  const preview = document.getElementById("submit-grade-preview");
+  preview.innerHTML = `
+    <div class="submit-grade-circle grade-${grade}">${grade}</div>
+    <div class="submit-stats-row">
+      <span>📚 ${s.academic}</span>
+      <span>💕 ${s.romance}</span>
+      <span>🎯 ${s.club}</span>
+      <span class="submit-total">합계 ${score}</span>
+    </div>
+  `;
+  document.getElementById("input-playername").value = "";
+  document.getElementById("submit-status").textContent = "";
+  document.getElementById("overlay-submit").classList.remove("hidden");
+}
+
+function closeSubmitScore() {
+  document.getElementById("overlay-submit").classList.add("hidden");
+}
+
+// ── 점수 Supabase에 저장
+async function submitScore() {
+  const name = document.getElementById("input-playername").value.trim();
+  if (!name) {
+    document.getElementById("submit-status").textContent =
+      "닉네임을 입력해주세요!";
+    return;
+  }
+
+  const statusEl = document.getElementById("submit-status");
+  statusEl.textContent = "등록 중…";
+
+  const s = G.stats;
+  const payload = {
+    name,
+    grade: _lastEnding ? _lastEnding.grade : "B",
+    academic: s.academic,
+    romance: s.romance,
+    club: s.club,
+    score: s.academic + s.romance + s.club,
+  };
+
+  try {
+    await sbFetch(LB_TABLE, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    statusEl.textContent = "✅ 등록 완료!";
+    setTimeout(() => {
+      closeSubmitScore();
+      openLeaderboard();
+    }, 800);
+  } catch (e) {
+    statusEl.textContent = `❌ 등록 실패: ${e.message}`;
+  }
+}
+
+// ── 리더보드 모달 열기 + 데이터 로드
+async function openLeaderboard() {
+  document.getElementById("overlay-leaderboard").classList.remove("hidden");
+  const listEl = document.getElementById("lb-list");
+  listEl.innerHTML = '<div class="lb-loading">불러오는 중…</div>';
+
+  try {
+    const rows = await sbFetch(
+      `${LB_TABLE}?select=name,grade,academic,romance,club,score,created_at&order=score.desc&limit=10`,
+    );
+    renderLeaderboard(rows, listEl);
+  } catch (e) {
+    listEl.innerHTML = `<div class="lb-loading lb-error">불러오기 실패: ${e.message}</div>`;
+  }
+}
+
+function closeLeaderboard() {
+  document.getElementById("overlay-leaderboard").classList.add("hidden");
+}
+
+function renderLeaderboard(rows, container) {
+  if (!rows || rows.length === 0) {
+    container.innerHTML = '<div class="lb-loading">아직 기록이 없습니다!</div>';
+    return;
+  }
+
+  const MEDAL = ["🥇", "🥈", "🥉"];
+  container.innerHTML = rows
+    .map((row, i) => {
+      const rank = i < 3 ? MEDAL[i] : `${i + 1}`;
+      const date = new Date(row.created_at).toLocaleDateString("ko-KR", {
+        month: "short",
+        day: "numeric",
+      });
+      return `
+        <div class="lb-row">
+          <span class="lb-rank">${rank}</span>
+          <div class="lb-info">
+            <div class="lb-name-grade">
+              <span class="lb-name">${escHtml(row.name)}</span>
+              <span class="lb-grade-badge grade-${row.grade}">${row.grade}</span>
+            </div>
+            <div class="lb-detail">📚${row.academic} 💕${row.romance} 🎯${row.club}</div>
+          </div>
+          <div class="lb-right">
+            <span class="lb-score">${row.score}</span>
+            <span class="lb-date">${date}</span>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+// ============================================================
+// 캐릭터 픽셀아트
+// ============================================================
+const CPXL = 3; // 픽셀 1칸 = 3 canvas px
+const CGRID_W = 20; // 캐릭터 그리드 너비
+const CGRID_H = 28; // 캐릭터 그리드 높이
+const CYPAD = 3; // 머리 위 반응 공간 (그리드 단위)
+
+let _cRaf = null;
+let _cT = 0;
+let _cReact = null; // 'academic'|'romance'|'club'|'special'|'fail'
+let _cReactEnd = 0;
+
+function initChar() {
+  const c = document.getElementById("char-canvas");
+  if (!c) return;
+  c.width = CGRID_W * CPXL;
+  c.height = CGRID_H * CPXL;
+  if (_cRaf) cancelAnimationFrame(_cRaf);
+  const tick = (t) => {
+    _cT = t;
+    if (Date.now() > _cReactEnd) _cReact = null;
+    _drawChar();
+    _cRaf = requestAnimationFrame(tick);
+  };
+  _cRaf = requestAnimationFrame(tick);
+}
+
+function stopChar() {
+  if (_cRaf) cancelAnimationFrame(_cRaf);
+  _cRaf = null;
+}
+
+function triggerCharReaction(type) {
+  _cReact = type;
+  _cReactEnd = Date.now() + 1600;
+}
+
+function _drawChar() {
+  const c = document.getElementById("char-canvas");
+  if (!c || !G) return;
+  const ctx = c.getContext("2d");
+  ctx.clearRect(0, 0, c.width, c.height);
+
+  const tired = Math.min(3, Math.floor(((G.week - 1) * 4) / TOTAL_WEEKS));
+  const breath = Math.sin(_cT * 0.0012) > 0 ? 1 : 0; // 숨쉬기
+
+  // 색상 팔레트
+  const PAL = {
+    SK: "#F5C99A",
+    SKD: "#D4995A",
+    HR: "#3D2B1F",
+    HRM: "#6B4A35",
+    EY: "#1A0A05",
+    EYW: "#FDF4E7",
+    BL: "#E8A0A8",
+    DC: "#9B8AAB",
+    SW: "#A8C8E8",
+    SH: ["#6B8FC9", "#7A9FC8", "#9060A0", "#C04040"][tired],
+    SHD: ["#4A6FA5", "#5A7FB5", "#703090", "#A03030"][tired],
+    PT: "#5B7FA6",
+    PTD: "#3D5F86",
+    SHO: "#2A1A10",
+    CG: "#7AAB8A",
+    CD: "#5A8A6A",
+    CB: "#8B5E3C",
+  };
+
+  const px = CPXL;
+  const g = (x, y, w, h, col) => {
+    if (x < 0 || y < 0) return;
+    ctx.fillStyle = col;
+    ctx.fillRect(x * px, y * px, w * px, h * px);
+  };
+
+  const slouch = tired;
+  const yH = CYPAD + breath;
+  const yB = yH + 9 + slouch;
+  const yP = yB + 7;
+  const yS = yP + 4;
+
+  // ── 머리카락 ──
+  g(5, yH, 10, 1, PAL.HR);
+  g(4, yH + 1, 12, 1, PAL.HR);
+  g(3, yH + 2, 2, 6, PAL.HR);
+  g(15, yH + 2, 2, 6, PAL.HR);
+  g(3, yH + 2, 1, 3, PAL.HRM);
+
+  // ── 얼굴 ──
+  g(5, yH + 1, 10, 1, PAL.SK);
+  g(4, yH + 2, 11, 7, PAL.SK);
+  g(14, yH + 2, 1, 7, PAL.SKD);
+
+  // ── 눈 ──
+  const ey = yH + 4;
+  if (tired === 0) {
+    g(6, ey, 2, 2, PAL.EYW);
+    g(7, ey, 1, 2, PAL.EY);
+    g(11, ey, 2, 2, PAL.EYW);
+    g(12, ey, 1, 2, PAL.EY);
+  } else if (tired === 1) {
+    g(6, ey, 2, 2, PAL.EY);
+    g(6, ey, 2, 1, PAL.HR);
+    g(11, ey, 2, 2, PAL.EY);
+    g(11, ey, 2, 1, PAL.HR);
+  } else if (tired === 2) {
+    g(6, ey + 1, 2, 1, PAL.EY);
+    g(6, ey, 2, 1, PAL.HR);
+    g(11, ey + 1, 2, 1, PAL.EY);
+    g(11, ey, 2, 1, PAL.HR);
+    g(5, ey + 2, 4, 1, PAL.DC);
+    g(10, ey + 2, 4, 1, PAL.DC);
+  } else {
+    g(6, ey + 1, 2, 1, PAL.EY);
+    g(6, ey, 2, 2, PAL.HR);
+    g(11, ey + 1, 2, 1, PAL.EY);
+    g(11, ey, 2, 2, PAL.HR);
+    g(5, ey + 2, 5, 2, PAL.DC);
+    g(10, ey + 2, 5, 2, PAL.DC);
+    g(6, ey + 4, 1, 2, PAL.SW);
+  }
+
+  // ── 볼터치 ──
+  if (tired <= 1) {
+    g(5, yH + 6, 2, 1, PAL.BL);
+    g(13, yH + 6, 2, 1, PAL.BL);
+  }
+
+  // ── 입 ──
+  const my = yH + 7;
+  if (tired === 0) {
+    g(7, my, 1, 1, PAL.EY);
+    g(8, my + 1, 3, 1, PAL.EY);
+    g(11, my, 1, 1, PAL.EY);
+  } else if (tired === 1) {
+    g(7, my, 5, 1, PAL.EY);
+  } else if (tired === 2) {
+    g(7, my + 1, 1, 1, PAL.EY);
+    g(8, my, 3, 1, PAL.EY);
+    g(11, my + 1, 1, 1, PAL.EY);
+  } else {
+    g(7, my, 6, 1, PAL.EY);
+    g(7, my + 1, 6, 1, PAL.EY);
+    g(8, my + 1, 4, 1, PAL.SKD);
+  }
+
+  // ── 땀방울 (exhausted) ──
+  if (tired >= 3) {
+    g(2, yH + 3, 1, 1, PAL.SW);
+    g(3, yH + 4, 1, 2, PAL.SW);
+    g(17, yH + 3, 1, 1, PAL.SW);
+    g(17, yH + 4, 1, 2, PAL.SW);
+  }
+
+  // ── 목 + 셔츠 ──
+  g(8, yB - 1, 4, 1, PAL.SK);
+  g(4, yB, 12, 7, PAL.SH);
+  g(4, yB, 12, 1, PAL.SHD);
+  g(8, yB, 4, 1, PAL.SK);
+  g(9, yB, 2, 2, PAL.SK);
+
+  // ── 왼팔 ──
+  const laD = tired >= 2 ? 2 : 0;
+  g(1, yB + 1 + laD, 3, 5, PAL.SH);
+  g(1, yB + 4 + laD, 3, 2, PAL.SHD);
+  g(0, yB + 5 + laD, 2, 2, PAL.SK);
+
+  // ── 오른팔 + 커피컵 ──
+  const raD = tired >= 2 ? 3 : 0;
+  g(16, yB + 1 + raD, 3, 5, PAL.SH);
+  g(16, yB + 4 + raD, 3, 2, PAL.SHD);
+  if (tired >= 2) {
+    g(16, yB + 5 + raD, 3, 3, PAL.CG);
+    g(16, yB + 5 + raD, 3, 1, PAL.CD);
+    g(16, yB + 6 + raD, 3, 1, PAL.CB);
+    g(19, yB + 6 + raD, 1, 2, PAL.CD);
+  } else {
+    g(17, yB + 5, 2, 2, PAL.SK);
+  }
+
+  // ── 바지 ──
+  g(4, yP, 4, 5, PAL.PT);
+  g(5, yP, 2, 5, PAL.PTD);
+  g(12, yP, 4, 5, PAL.PT);
+  g(13, yP, 2, 5, PAL.PTD);
+  g(4, yP, 12, 1, PAL.PTD);
+
+  // ── 신발 ──
+  g(3, yS, 6, 2, PAL.SHO);
+  g(11, yS, 6, 2, PAL.SHO);
+
+  // ── 반응 애니메이션 ──
+  if (_cReact) {
+    const prog = Math.max(0, 1 - (_cReactEnd - Date.now()) / 1600);
+    const ry = Math.max(0, Math.floor(yH - 2 - prog * 4));
+    const HC = "#E87090",
+      SC = "#F0E060",
+      BC = "#6B8FC9";
+
+    if (_cReact === "romance") {
+      g(6, ry + 1, 2, 2, HC);
+      g(10, ry + 1, 2, 2, HC);
+      g(5, ry + 2, 8, 2, HC);
+      g(6, ry + 4, 6, 1, HC);
+      g(7, ry + 5, 4, 1, HC);
+      g(8, ry + 6, 2, 1, HC);
+    } else if (_cReact === "academic") {
+      g(7, ry, 6, 4, "#F5E0A0");
+      g(7, ry, 6, 1, "#C0A060");
+      g(9, ry + 1, 2, 3, "#C0A060");
+      g(13, ry, 1, 1, SC);
+      g(13, ry + 2, 1, 1, SC);
+    } else if (_cReact === "club") {
+      g(8, ry, 4, 1, SC);
+      g(7, ry + 1, 6, 1, SC);
+      g(6, ry + 2, 8, 1, SC);
+      g(7, ry + 3, 6, 1, SC);
+      g(8, ry + 4, 4, 1, SC);
+    } else if (_cReact === "special") {
+      g(7, ry, 2, 2, HC);
+      g(11, ry, 2, 2, SC);
+      g(7, ry + 3, 6, 1, BC);
+    } else if (_cReact === "fail") {
+      g(4, ry + 2, 3, 1, PAL.SW);
+      g(5, ry + 3, 2, 2, PAL.SW);
+      g(12, ry + 2, 3, 1, PAL.SW);
+      g(13, ry + 3, 2, 2, PAL.SW);
+    }
+  }
+
+  // ── 기분 텍스트 업데이트 ──
+  const moods = [
+    "신입생의 패기! 🔥",
+    "그래도 버틸만해 😐",
+    "커피는 생명수... ☕",
+    "제발... 끝나라... 😵",
+  ];
+  const hintEl = document.getElementById("char-event-hint");
+  const moodEl = document.getElementById("char-mood-text");
+  if (moodEl) moodEl.textContent = moods[tired];
+  if (hintEl) {
+    const specialId = SPECIAL_WEEKS[G.week];
+    if (G.week === TOTAL_WEEKS) hintEl.textContent = "⚠️ 기말고사 주간!";
+    else if (specialId === "mt") hintEl.textContent = "🏕 이번 주 MT!";
+    else if (G.week === 6) hintEl.textContent = "🎆 축제 주간!";
+    else hintEl.textContent = "";
+  }
+}
+
+function escHtml(str) {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
